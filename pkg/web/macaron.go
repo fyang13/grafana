@@ -57,13 +57,15 @@ func (invoke handlerFuncInvoker) Invoke(params []interface{}) ([]reflect.Value, 
 	return nil, nil
 }
 
-//go:linkname hack_wrap github.com/grafana/grafana/pkg/web/hack.Wrap
+//go:linkname hack_wrap github.com/grafana/grafana/pkg/api/response.Wrap
 func hack_wrap(Handler) http.HandlerFunc
 
 // validateAndWrapHandler makes sure a handler is a callable function, it panics if not.
 // When the handler is also potential to be any built-in inject.FastInvoker,
 // it wraps the handler automatically to have some performance gain.
 func validateAndWrapHandler(h Handler) Handler {
+	return h
+
 	return hack_wrap(h)
 }
 

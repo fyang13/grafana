@@ -1,43 +1,48 @@
-package hack
+package response
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/grafana/grafana/pkg/api/response"
 	"github.com/grafana/grafana/pkg/models"
-	"github.com/grafana/grafana/pkg/services/contexthandler"
+	"github.com/grafana/grafana/pkg/services/contexthandler/ctxkey"
 	"github.com/grafana/grafana/pkg/web"
 )
 
 type (
-	HandlerStd       = func(http.ResponseWriter, *http.Request)
-	HandlerStdCtx    = func(http.ResponseWriter, *http.Request, *web.Context)
-	HandlerReqCtx    = func(*models.ReqContext)
-	HandlerReqCtxRes = func(*models.ReqContext) response.Response
-	HandlerCtx       = func(*web.Context)
+	handlerStd       = func(http.ResponseWriter, *http.Request)
+	handlerStdCtx    = func(http.ResponseWriter, *http.Request, *web.Context)
+	handlerStdReqCtx = func(http.ResponseWriter, *http.Request, *models.ReqContext)
+	handlerReqCtx    = func(*models.ReqContext)
+	handlerReqCtxRes = func(*models.ReqContext) Response
+	handlerCtx       = func(*web.Context)
 )
 
 func Wrap(h web.Handler) http.HandlerFunc {
 	switch handle := h.(type) {
-	case HandlerStd:
+	case handlerStd:
 		return handle
-	case HandlerStdCtx:
+	case handlerStdCtx:
 		return func(w http.ResponseWriter, r *http.Request) {
 			handle(w, r, web.FromContext(r.Context()))
 		}
-	case HandlerReqCtx:
+	case handlerStdReqCtx:
 		return func(w http.ResponseWriter, r *http.Request) {
-			handle(contexthandler.FromContext(r.Context()))
+			handle(w, r, FromContext(r.Context()))
 		}
-	case HandlerReqCtxRes:
+	case handlerReqCtx:
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := contexthandler.FromContext(r.Context())
+			handle(FromContext(r.Context()))
+		}
+	case handlerReqCtxRes:
+		return func(w http.ResponseWriter, r *http.Request) {
+			ctx := FromContext(r.Context())
 			res := handle(ctx)
 			res.WriteTo(ctx)
 		}
-	case HandlerCtx:
+	case handlerCtx:
 		return func(w http.ResponseWriter, r *http.Request) {
 			handle(web.FromContext(r.Context()))
 		}
@@ -46,17 +51,25 @@ func Wrap(h web.Handler) http.HandlerFunc {
 	panic(fmt.Sprintf("unexpected handler type: %T", h))
 }
 
+func FromContext(ctx context.Context) *models.ReqContext {
+	reqCtx, ok := ctx.Value(ctxkey.Key{}).(*models.ReqContext)
+	if !ok {
+		panic("no *models.ReqContext found")
+	}
+	return reqCtx
+}
+
 func HandlerType(h web.Handler) string {
 	switch h.(type) {
-	case HandlerStd:
+	case handlerStd:
 		return "HandlerStd"
-	case HandlerStdCtx:
+	case handlerStdCtx:
 		return "HandlerStdCtx"
-	case HandlerReqCtx:
+	case handlerReqCtx:
 		return "HandlerReqCtx"
-	case HandlerReqCtxRes:
+	case handlerReqCtxRes:
 		return "HandlerReqCtxRes"
-	case HandlerCtx:
+	case handlerCtx:
 		return "HandlerCtx"
 	}
 
