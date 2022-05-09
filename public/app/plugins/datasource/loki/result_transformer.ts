@@ -346,8 +346,16 @@ export function lokiStreamsToDataFrames(
   const dataFrame = lokiStreamsToRawDataFrame(data, target.refId);
   enhanceDataFrame(dataFrame, config);
 
-  if (meta.custom && dataFrame.fields.some((f) => f.labels && Object.keys(f.labels).some((l) => l === '__error__'))) {
-    meta.custom.error = 'Error when parsing some of the logs';
+  const labelsField = dataFrame.fields.find((f) => f.name === 'labels');
+
+  if (meta.custom && labelsField) {
+    const allLabelNames = labelsField.values
+      .toArray()
+      .map((labelObject) => Object.keys(labelObject))
+      .flat();
+    if (allLabelNames.some((l) => l === '__error__')) {
+      meta.custom.error = 'Error when parsing some of the logs';
+    }
   }
 
   if (stats.length && !data.length) {

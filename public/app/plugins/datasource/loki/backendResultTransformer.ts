@@ -1,4 +1,4 @@
-import { DataQueryResponse, DataFrame, isDataFrame, FieldType, QueryResultMeta } from '@grafana/data';
+import { DataQueryResponse, DataFrame, isDataFrame, FieldType, QueryResultMeta, Labels } from '@grafana/data';
 
 import { makeTableFrames } from './makeTableFrames';
 import { formatQuery, getHighlighterExpressionsFromQuery } from './query_utils';
@@ -20,13 +20,21 @@ function setFrameMeta(frame: DataFrame, meta: QueryResultMeta): DataFrame {
 }
 
 function processStreamFrame(frame: DataFrame, query: LokiQuery | undefined): DataFrame {
+  const custom: Record<string, string> = {
+    // used by logs_model
+    lokiQueryStatKey: 'Summary: total bytes processed',
+  };
+
+  const labelSets: Labels[] = frame.fields.find((f) => f.name === 'labels')?.values.toArray() ?? [];
+
+  if (labelSets.some((labels) => labels.__error__ !== undefined)) {
+    custom.error = 'Error when parsing some of the logs';
+  }
+
   const meta: QueryResultMeta = {
     preferredVisualisationType: 'logs',
     searchWords: query !== undefined ? getHighlighterExpressionsFromQuery(formatQuery(query.expr)) : undefined,
-    custom: {
-      // used by logs_model
-      lokiQueryStatKey: 'Summary: total bytes processed',
-    },
+    custom,
   };
 
   return setFrameMeta(frame, meta);

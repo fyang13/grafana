@@ -31,7 +31,10 @@ const inputFrame: DataFrame = {
           json: true,
         },
       },
-      values: new ArrayVector(['{ "level": "info", "code": "41🌙" }', '{ "level": "error", "code": "41🌙" }']),
+      values: new ArrayVector([
+        { level: 'info', code: '41🌙' },
+        { level: 'error', code: '41🌙' },
+      ]),
     },
     {
       name: 'tsNs',
@@ -60,6 +63,45 @@ describe('loki backendResultTransformer', () => {
       searchWords: ['thing1'],
       custom: {
         lokiQueryStatKey: 'Summary: total bytes processed',
+      },
+    };
+
+    const expected: DataQueryResponse = { data: [expectedFrame] };
+
+    const result = transformBackendResult(response, [
+      {
+        refId: 'A',
+        expr: LOKI_EXPR,
+      },
+    ]);
+    expect(result).toEqual(expected);
+  });
+
+  it('handle loki parsing errors', () => {
+    const clonedFrame = cloneDeep(inputFrame);
+    clonedFrame.fields[2] = {
+      name: 'labels',
+      type: FieldType.string,
+      config: {
+        custom: {
+          json: true,
+        },
+      },
+      values: new ArrayVector([
+        { level: 'info', code: '41🌙', __error__: 'LogfmtParserErr' },
+        { level: 'error', code: '41🌙' },
+      ]),
+    };
+    const response: DataQueryResponse = { data: [clonedFrame] };
+
+    const expectedFrame = cloneDeep(clonedFrame);
+    expectedFrame.meta = {
+      ...expectedFrame.meta,
+      preferredVisualisationType: 'logs',
+      searchWords: ['thing1'],
+      custom: {
+        lokiQueryStatKey: 'Summary: total bytes processed',
+        error: 'Error when parsing some of the logs',
       },
     };
 
